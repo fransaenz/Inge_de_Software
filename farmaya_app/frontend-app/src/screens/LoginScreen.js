@@ -6,18 +6,57 @@ export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
+  //Validar Email y Contraseña
+  const validateEmail = (email) => {
+    const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return regex.test(email);
+  };
+
+  const validatePassword = (password) => {
+    return password.length >= 6;
+  };
+
+
   const handleLogin = async () => {
-    const storedUser = await AsyncStorage.getItem('user');
-    if (storedUser) {
-      const user = JSON.parse(storedUser);
-      if (user.email === email && user.password === password) {
-        alert('Inicio de sesión exitoso');
-        navigation.replace('Home');
+    // Validaciones antes de intentar el login
+    if (!email.trim() || !password.trim()) {
+      alert('Por favor complete todos los campos');
+      return;
+    }
+
+    if (!validateEmail(email)) {
+      alert('Por favor ingrese un email válido');
+      return;
+    }
+
+    if (!validatePassword(password)) {
+      alert('La contraseña debe tener al menos 6 caracteres');
+      return;
+    }
+
+    try {
+      const storedUser = await AsyncStorage.getItem('user');
+      if (storedUser) {
+        const user = JSON.parse(storedUser);
+        if (user.email === email && user.password === password) {
+          // Guardar el estado de la sesión
+          await AsyncStorage.setItem('isLoggedIn', 'true');
+          await AsyncStorage.setItem('currentUser', JSON.stringify({
+            email: user.email,
+            // No guardar la contraseña en la sesión
+          }));
+          
+          alert('Inicio de sesión exitoso');
+          navigation.replace('Home');
+        } else {
+          alert('Email o contraseña incorrectos');
+        }
       } else {
-        alert('Email o contraseña incorrectos');
+        alert('No hay usuarios registrados');
       }
-    } else {
-      alert('No hay usuarios registrados');
+    } catch (error) {
+      console.error('Error durante el login:', error);
+      alert('Ocurrió un error al iniciar sesión');
     }
   };
 
