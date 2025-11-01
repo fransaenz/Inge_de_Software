@@ -1,8 +1,11 @@
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useTheme } from '../theme/ThemeProvider';
 
 export default function WelcomeScreen({ navigation }) {
+  const { theme, isDarkMode, toggleTheme } = useTheme();
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <View style={styles.logoContainer}>
         <Image
           source={require('../assets/logo.png')} // Asegúrate de tener el logo en esta ruta
@@ -11,8 +14,18 @@ export default function WelcomeScreen({ navigation }) {
         />
       </View>
 
-      <Text style={styles.title}>Bienvenidos a FarmaYa</Text>
-      <Text style={styles.slogan}>Tu farmacia de confianza, a domicilio</Text>
+      <Text style={[styles.title, { color: theme.colors.text }]}>
+        Bienvenidos a FarmaYa
+      </Text>
+      <Text style={[styles.slogan, { color: theme.colors.textSecondary }]}>
+        Tu farmacia de confianza, a domicilio
+      </Text>
+
+      <TouchableOpacity onPress={toggleTheme}>
+        <Text style={{ color: theme.colors.primary }}>
+          Cambiar a modo {isDarkMode ? 'claro' : 'oscuro'}
+        </Text>
+      </TouchableOpacity>
 
       <View style={styles.buttonContainer}>
         <TouchableOpacity
@@ -39,7 +52,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
-    backgroundColor: '#fff',
   },
   logoContainer: {
     marginBottom: 40,
