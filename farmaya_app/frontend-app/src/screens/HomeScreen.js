@@ -1,6 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useState } from 'react';
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import * as DocumentPicker from 'expo-document-picker';
+
 
 export default function HomeScreen({ navigation }) {
   const [displayName, setDisplayName] = useState('Usuario');
@@ -35,10 +37,29 @@ export default function HomeScreen({ navigation }) {
     loadUserAndConfigureHeader();
   }, [navigation, displayName]);
 
-  const handleUpload = () => {
-    Alert.alert('Cargar receta', 'Funcionalidad para seleccionar foto o PDF pendiente.');
-    // navigation.navigate('Upload') // descomentar si creas esa pantalla
-  };
+  const handleUpload = async () => {
+  try {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: ['image/*', 'application/pdf'], // permite imágenes y PDFs
+      copyToCacheDirectory: true,
+    });
+
+    if (result.canceled) {
+      Alert.alert('Cancelado', 'No seleccionaste ningún archivo.');
+      return;
+    }
+
+    const file = result.assets[0];
+    Alert.alert('Archivo seleccionado', `Nombre: ${file.name}\nTipo: ${file.mimeType}`);
+    console.log('Archivo:', file);
+
+    // 🔹 Acá podrías luego subir el archivo a tu backend o guardarlo localmente.
+  } catch (error) {
+    console.error('Error seleccionando archivo:', error);
+    Alert.alert('Error', 'Hubo un problema al seleccionar el archivo.');
+  }
+};
+
 
   return (
     <View style={styles.container}>

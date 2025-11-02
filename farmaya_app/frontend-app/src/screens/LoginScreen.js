@@ -47,7 +47,13 @@ export default function LoginScreen({ navigation }) {
           }));
           
           alert('Inicio de sesión exitoso');
-          navigation.replace('Home');
+          if (user.rol === 'farmacia') {
+            navigation.replace('HomeFarmacia');
+          } else if (user.rol === 'repartidor') {
+            navigation.replace('HomeRepartidor');
+          } else {
+            navigation.replace('Home'); // usuario normal
+          }
         } else {
           alert('Email o contraseña incorrectos');
         }
