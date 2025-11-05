@@ -10,6 +10,7 @@ import HomeRepartidorScreen from './src/screens/HomeRepartidorScreen';
 import ProfileFarmaciaScreen from './src/screens/ProfileFarmaciaScreen';
 import PedidosFarmaciaScreen from './src/screens/PedidosFarmaciaScreen';
 import EditarPerfilFarmaciaScreen from "./src/screens/EditarPerfilFarmaciaScreen";
+import PedidoActivoScreen from "./src/screens/PedidoActivoScreen";
 import { ThemeProvider } from './src/theme/ThemeProvider';
 
 const Stack = createNativeStackNavigator();
@@ -29,6 +30,7 @@ export default function App() {
           <Stack.Screen name="ProfileFarmacia" component={ProfileFarmaciaScreen} />
           <Stack.Screen name="PedidosFarmacia" component={PedidosFarmaciaScreen} />
           <Stack.Screen name="EditarPerfilFarmacia" component={EditarPerfilFarmaciaScreen} />
+          <Stack.Screen name="PedidoActivo" component={PedidoActivoScreen} />
         </Stack.Navigator>
       </NavigationContainer>
     </ThemeProvider>
