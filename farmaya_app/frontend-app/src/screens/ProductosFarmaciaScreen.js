@@ -38,19 +38,19 @@ export default function ProductosFarmaciaScreen({ route, navigation }) {
     try {
       const token = await AsyncStorage.getItem("accessToken");
       if (!token) {
-        Alert.alert("Sesión expirada", "Iniciá sesión nuevamente.");
+        Alert.alert("Sesión expirada", "Por favor, iniciá sesión nuevamente.");
         return;
       }
 
       const payload = {
-        farmacia_id: farmacia.id,
         producto_id: producto.id,
         cantidad: 1,
         direccion_entrega: "Entrega a domicilio",
         metodo_pago: "efectivo",
       };
 
-      const response = await API.post("pedidos/crear/", payload, {
+      // ✅ Ruta corregida con el ID de la farmacia
+      const response = await API.post(`pedidos/crear/${farmacia.id}/`, payload, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -61,27 +61,35 @@ export default function ProductosFarmaciaScreen({ route, navigation }) {
       console.log("📦 Pedido creado:", response.data);
     } catch (error) {
       console.error("❌ Error al crear pedido:", error.response?.data || error);
-      Alert.alert("Error", "No se pudo realizar el pedido.");
+      Alert.alert(
+        "Error",
+        error.response?.data?.detail || "No se pudo realizar el pedido."
+      );
     }
   };
 
+  // 🔹 Loader
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#1E88E5" />
-        <Text>Cargando productos...</Text>
+        <Text style={{ marginTop: 8 }}>Cargando productos...</Text>
       </View>
     );
   }
 
+  // 🔹 Sin productos
   if (productos.length === 0) {
     return (
       <View style={styles.container}>
-        <Text style={styles.emptyText}>Esta farmacia no tiene productos cargados.</Text>
+        <Text style={styles.emptyText}>
+          Esta farmacia no tiene productos cargados.
+        </Text>
       </View>
     );
   }
 
+  // 🔹 Lista de productos
   return (
     <View style={styles.container}>
       <Text style={styles.title}>🛍 Productos de {farmacia.nombre}</Text>
@@ -107,7 +115,9 @@ export default function ProductosFarmaciaScreen({ route, navigation }) {
               <Text style={styles.descripcion}>{item.descripcion}</Text>
             ) : null}
             <Text style={styles.precio}>💰 ${item.precio}</Text>
-            {item.requiere_receta && <Text style={styles.receta}>📜 Requiere receta</Text>}
+            {item.requiere_receta && (
+              <Text style={styles.receta}>📜 Requiere receta</Text>
+            )}
           </TouchableOpacity>
         )}
       />
@@ -115,6 +125,7 @@ export default function ProductosFarmaciaScreen({ route, navigation }) {
   );
 }
 
+// 🎨 Estilos
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff", padding: 16 },
   title: { fontSize: 20, fontWeight: "bold", color: "#1E88E5", marginBottom: 12 },

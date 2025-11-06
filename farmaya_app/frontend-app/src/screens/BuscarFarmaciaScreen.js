@@ -67,8 +67,9 @@ export default function BuscarFarmaciaScreen({ navigation }) {
       // 🔹 Normalizar datos
       const farmaciasConUbicacion = farmaciasData
         .filter((f) => f.latitud && f.longitud)
-        .map((f, i) => ({
-          ...f,
+        .map((f) => ({
+          id: f.id, // ✅ asegurar que el ID quede disponible
+          nombre: f.nombre || "Farmacia sin nombre",
           latitud: parseFloat(f.latitud),
           longitud: parseFloat(f.longitud),
           direccion: f.direccion || "Dirección no disponible",
@@ -104,6 +105,11 @@ export default function BuscarFarmaciaScreen({ navigation }) {
 
   // 🔹 Ir a los productos
   const realizarPedido = (farmacia) => {
+    console.log("📦 Farmacia seleccionada:", farmacia); // ✅ Verificar que tenga ID
+    if (!farmacia?.id) {
+      Alert.alert("Error", "No se encontró el ID de la farmacia seleccionada.");
+      return;
+    }
     setSelectedFarmacia(null);
     navigation.navigate("ProductosFarmacia", { farmacia });
   };
@@ -127,12 +133,12 @@ export default function BuscarFarmaciaScreen({ navigation }) {
       >
         {farmacias.map((f, index) => (
           <Marker
-            key={index}
+            key={f.id || index}
             coordinate={{
-              latitude: parseFloat(f.latitud),
-              longitude: parseFloat(f.longitud),
+              latitude: f.latitud,
+              longitude: f.longitud,
             }}
-            title={f.nombre || "Farmacia"}
+            title={f.nombre}
             description={f.direccion}
             onPress={() => setSelectedFarmacia(f)}
           >
@@ -189,10 +195,10 @@ export default function BuscarFarmaciaScreen({ navigation }) {
   );
 }
 
+// 🎨 Estilos
 const styles = StyleSheet.create({
   map: { flex: 1 },
   loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
-
   markerContainer: {
     width: 50,
     height: 50,
@@ -214,7 +220,6 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "#fff",
   },
-
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.4)",
