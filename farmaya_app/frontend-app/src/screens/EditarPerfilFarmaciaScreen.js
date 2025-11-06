@@ -1,42 +1,88 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, TextInput, StyleSheet, TouchableOpacity, Alert } from "react-native";
+import { View, Text, TextInput, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import API from "../api/api";
 
 export default function EditarPerfilFarmaciaScreen({ navigation }) {
-  const [farmacia, setFarmacia] = useState({});
+  const [farmacia, setFarmacia] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
+  // 🔹 Cargar datos de la farmacia
   useEffect(() => {
     const loadData = async () => {
-      const stored = await AsyncStorage.getItem("user");
-      if (stored) {
-        setFarmacia(JSON.parse(stored));
+      try {
+        const token = await AsyncStorage.getItem("accessToken");
+        if (!token) {
+          Alert.alert("Sesión expirada", "Por favor, inicia sesión nuevamente.");
+          navigation.replace("Login");
+          return;
+        }
+
+        // ✅ Ruta corregida
+        const response = await API.get("usuarios/me/", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        setFarmacia(response.data);
+      } catch (error) {
+        console.error("Error cargando datos:", error.response?.data || error);
+        Alert.alert("Error", "No se pudieron cargar los datos del perfil.");
+      } finally {
+        setLoading(false);
       }
     };
     loadData();
   }, []);
 
+  // 🔹 Guardar cambios
   const handleSave = async () => {
-    await AsyncStorage.setItem("user", JSON.stringify(farmacia));
-    Alert.alert("✅ Guardado", "Datos actualizados correctamente");
-    navigation.goBack();
+    try {
+      setSaving(true);
+      const token = await AsyncStorage.getItem("accessToken");
+
+      // ✅ Ruta corregida
+      const response = await API.put("usuarios/me/", farmacia, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      await AsyncStorage.setItem("user", JSON.stringify(response.data));
+      Alert.alert("✅ Guardado", "Datos actualizados correctamente.");
+      navigation.goBack();
+    } catch (error) {
+      console.error("Error al guardar cambios:", error.response?.data || error);
+      Alert.alert("Error", "No se pudo actualizar el perfil.");
+    } finally {
+      setSaving(false);
+    }
   };
+
+  if (loading) {
+    return <ActivityIndicator size="large" color="#1E88E5" style={{ flex: 1 }} />;
+  }
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Editar Perfil</Text>
 
-      {["nombre", "direccion", "telefono", "email", "horarios"].map((field) => (
+      {["direccion", "telefono", "horarios"].map((field) => (
         <TextInput
           key={field}
           style={styles.input}
-          placeholder={field}
-          value={farmacia[field]}
+          placeholder={field.charAt(0).toUpperCase() + field.slice(1)}
+          value={farmacia?.[field] || ""}
           onChangeText={(text) => setFarmacia({ ...farmacia, [field]: text })}
         />
       ))}
 
-      <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-        <Text style={styles.saveButtonText}>💾 Guardar cambios</Text>
+      <TouchableOpacity
+        style={[styles.saveButton, saving && { backgroundColor: "#999" }]}
+        onPress={handleSave}
+        disabled={saving}
+      >
+        <Text style={styles.saveButtonText}>
+          {saving ? "💾 Guardando..." : "💾 Guardar cambios"}
+        </Text>
       </TouchableOpacity>
     </View>
   );

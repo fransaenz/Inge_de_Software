@@ -1,107 +1,103 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, Alert, Linking } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, Alert, ActivityIndicator, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+import API from '../api/api';
 
-export default function PedidosFarmacia() {
+export default function PedidosFarmaciaScreen() {
   const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Cargar pedidos simulados o guardados
-  useEffect(() => {
-    const loadOrders = async () => {
-
-      const stored = await AsyncStorage.getItem('farmaciaOrders');
-
-      if (stored) {
-        setOrders(JSON.parse(stored));
-      } else {
-        // Pedidos simulados - luego vendrán del backend
-        const initialOrders = [
-          {
-            id: '1',
-            cliente: 'Juan Pérez',
-            obraSocial: 'OSDE',
-            receta: true,
-            estado: 'pendiente',
-            archivo: 'receta_juan.pdf',
-            archivoURL: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf'
-          },
-          {
-            id: '2',
-            cliente: 'Maria Lopez',
-            obraSocial: 'IOMA',
-            receta: false,
-            estado: 'confirmado',
-            producto: 'Ibuprofeno 600mg'
-          }
-        ];
-
-        setOrders(initialOrders);
-        await AsyncStorage.setItem('farmaciaOrders', JSON.stringify(initialOrders));
+  // 🔹 Obtener pedidos desde el backend
+  const loadOrders = async () => {
+    try {
+      const token = await AsyncStorage.getItem('accessToken');
+      if (!token) {
+        Alert.alert('Sesión expirada', 'Por favor, inicie sesión nuevamente.');
+        return;
       }
-    };
 
+      // ✅ Ruta correcta del backend
+      const response = await API.get('accounts/pedidos/farmacia/', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setOrders(response.data);
+    } catch (error) {
+      console.error('Error al cargar pedidos:', error.response?.data || error);
+      Alert.alert('Error', 'No se pudieron cargar los pedidos.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     loadOrders();
   }, []);
 
-  const openPDF = async (url) => {
-  try {
-    // 🌐 Web → abrir en nueva pestaña
-    if (Platform.OS === 'web') {
-      window.open(url, '_blank');
-      return;
+  // 🔹 Descargar y abrir receta
+  const openFile = async (url) => {
+    try {
+      if (Platform.OS === 'web') {
+        window.open(url, '_blank');
+        return;
+      }
+
+      const fileUri = FileSystem.documentDirectory + 'receta_temp.pdf';
+      const { uri } = await FileSystem.downloadAsync(url, fileUri);
+      await Sharing.shareAsync(uri);
+    } catch (error) {
+      console.error('Error al abrir archivo:', error);
+      Alert.alert('Error', 'No se pudo abrir la receta.');
     }
+  };
 
-    // 📱 Mobile → descargar y abrir
-    const fileUri = FileSystem.documentDirectory + 'temp.pdf';
-    const downloaded = await FileSystem.downloadAsync(url, fileUri);
+  // 🔹 Validar receta → cambiar estado del pedido
+  const validarReceta = async (pedidoId) => {
+    try {
+      const token = await AsyncStorage.getItem('accessToken');
+      await API.put(
+        `accounts/pedidos/${pedidoId}/`,
+        { estado: 'aprobado' },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
 
-    await Sharing.shareAsync(downloaded.uri);
-  } catch (error) {
-    console.error('Error abriendo PDF:', error);
-    Alert.alert('Error', 'No se pudo abrir el archivo');
-  }
-};
-
-  const validarReceta = async (id) => {
-    const updated = orders.map(order =>
-      order.id === id ? { ...order, estado: 'validado' } : order
-    );
-
-    setOrders(updated);
-    await AsyncStorage.setItem('farmaciaOrders', JSON.stringify(updated));
-
-    Alert.alert('✅ Receta validada', 'El pedido ha sido confirmado.');
+      Alert.alert('✅ Receta validada', 'El pedido fue aprobado.');
+      setOrders((prev) =>
+        prev.map((o) => (o.id === pedidoId ? { ...o, estado: 'aprobado' } : o))
+      );
+    } catch (error) {
+      console.error('Error al validar receta:', error.response?.data || error);
+      Alert.alert('Error', 'No se pudo validar la receta.');
+    }
   };
 
   const renderItem = ({ item }) => (
     <View style={styles.card}>
-      <Text style={styles.text}>👤 Cliente: {item.cliente}</Text>
-      <Text style={styles.text}>🏥 Obra social: {item.obraSocial}</Text>
+      <Text style={styles.text}>👤 Cliente: {item.usuario_email}</Text>
+      <Text style={styles.text}>💊 Producto: {item.producto_nombre}</Text>
+      <Text style={styles.text}>📦 Cantidad: {item.cantidad}</Text>
+      <Text style={styles.text}>🏠 Dirección: {item.direccion_entrega}</Text>
 
-      {item.receta ? (
+      {item.receta_url ? (
         <>
           <Text style={styles.text}>🧾 Receta adjunta</Text>
           <TouchableOpacity
             style={styles.smallButton}
-            onPress={() => openPDF(item.archivoURL)}
+            onPress={() => openFile(item.receta_url)}
           >
             <Text style={styles.smallButtonText}>📄 Ver receta</Text>
           </TouchableOpacity>
         </>
       ) : (
-        <>
-          <Text style={styles.text}>🛒 Producto: {item.producto}</Text>
-        </>
+        <Text style={styles.text}>🚫 No requiere receta</Text>
       )}
 
       <Text style={styles.text}>
-        📌 Estado: {item.estado === 'pendiente' ? '⏳ Pendiente' : '✅ Confirmado'}
+        📌 Estado: {item.estado === 'pendiente' ? '⏳ Pendiente' : '✅ Aprobado'}
       </Text>
 
-      {item.receta && item.estado === 'pendiente' && (
+      {item.estado === 'pendiente' && item.receta_url && (
         <TouchableOpacity
           style={styles.button}
           onPress={() => validarReceta(item.id)}
@@ -112,13 +108,17 @@ export default function PedidosFarmacia() {
     </View>
   );
 
+  if (loading)
+    return <ActivityIndicator size="large" color="#1E88E5" style={{ flex: 1 }} />;
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>📦 Pedidos Recibidos</Text>
       <FlatList
         data={orders}
-        keyExtractor={item => item.id}
+        keyExtractor={(item) => item.id.toString()}
         renderItem={renderItem}
+        ListEmptyComponent={<Text>No hay pedidos nuevos</Text>}
       />
     </View>
   );
@@ -136,16 +136,14 @@ const styles = StyleSheet.create({
     borderColor: '#ddd',
   },
   text: { fontSize: 15, marginBottom: 6, color: '#333' },
-
   smallButton: {
     backgroundColor: '#6c8eff',
     paddingVertical: 6,
     borderRadius: 6,
     marginBottom: 6,
-    width: 120
+    width: 120,
   },
   smallButtonText: { color: '#fff', textAlign: 'center', fontWeight: '600' },
-
   button: {
     backgroundColor: '#1E88E5',
     paddingVertical: 10,

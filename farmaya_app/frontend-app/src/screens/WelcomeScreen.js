@@ -1,14 +1,14 @@
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, StyleSheet, Text, TouchableOpacity, View, SafeAreaView } from 'react-native';
 import { useTheme } from '../theme/ThemeProvider';
 
 export default function WelcomeScreen({ navigation }) {
   const { theme, isDarkMode, toggleTheme } = useTheme();
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <View style={styles.logoContainer}>
         <Image
-          source={require('../assets/logo.png')} // Asegúrate de tener el logo en esta ruta
+          source={require('../assets/logo.png')} // ✅ ruta corregida
           style={styles.logo}
           resizeMode="contain"
         />
@@ -17,12 +17,13 @@ export default function WelcomeScreen({ navigation }) {
       <Text style={[styles.title, { color: theme.colors.text }]}>
         Bienvenidos a FarmaYa
       </Text>
+
       <Text style={[styles.slogan, { color: theme.colors.textSecondary }]}>
         Tu farmacia de confianza, a domicilio
       </Text>
 
       <TouchableOpacity onPress={toggleTheme}>
-        <Text style={{ color: theme.colors.primary }}>
+        <Text style={{ color: theme.colors.primary, marginTop: 10 }}>
           Cambiar a modo {isDarkMode ? 'claro' : 'oscuro'}
         </Text>
       </TouchableOpacity>
@@ -42,53 +43,23 @@ export default function WelcomeScreen({ navigation }) {
           <Text style={styles.buttonText}>Registrarse</Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  logoContainer: {
-    marginBottom: 40,
-  },
-  logo: {
-    width: 200,
-    height: 200,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 10,
-    color: '#333',
-  },
-  slogan: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 40,
-    textAlign: 'center',
-  },
-  buttonContainer: {
-    width: '100%',
-    gap: 15,
-  },
+  container: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
+  logoContainer: { marginBottom: 40 },
+  logo: { width: 200, height: 200 },
+  title: { fontSize: 24, fontWeight: 'bold', marginBottom: 10 },
+  slogan: { fontSize: 16, marginBottom: 40, textAlign: 'center' },
+  buttonContainer: { width: '100%', gap: 15, marginTop: 10 },
   button: {
     backgroundColor: '#007AFF',
     padding: 15,
     borderRadius: 10,
     width: '100%',
   },
-  registerButton: {
-    backgroundColor: '#34C759',
-  },
-  buttonText: {
-    color: '#fff',
-    textAlign: 'center',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
+  registerButton: { backgroundColor: '#34C759' },
+  buttonText: { color: '#fff', textAlign: 'center', fontSize: 16, fontWeight: 'bold' },
 });

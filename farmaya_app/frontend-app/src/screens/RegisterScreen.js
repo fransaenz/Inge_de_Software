@@ -1,60 +1,102 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useState } from 'react';
-import { Button, StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  StyleSheet,
+  Alert,
+  Button,
+  ActivityIndicator,
+} from 'react-native';
 import { Picker } from '@react-native-picker/picker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import API from '../api/api';
 
 export default function RegisterScreen({ navigation }) {
   const [nombre, setNombre] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [rol, setRol] = useState('usuario');
+  const [rol, setRol] = useState('cliente');
+  const [direccion, setDireccion] = useState('');
+  const [horarios, setHorarios] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  //Validar Email y Contraseña
-  const validateEmail = (email) => {
-    const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return regex.test(email);
-  };
-
-  const validatePassword = (password) => {
-    return password.length >= 6;
-  };
-
+  const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
   const handleRegister = async () => {
-    if (!email.trim() || !password.trim()) {
-      alert('Por favor complete todos los campos');
+    if (!nombre || !email || !password) {
+      Alert.alert('Error', 'Por favor completa todos los campos obligatorios.');
       return;
     }
 
     if (!validateEmail(email)) {
-      alert('Por favor ingrese un email válido');
+      Alert.alert('Error', 'Por favor ingresa un email válido.');
       return;
     }
 
-    if (!validatePassword(password)) {
-      alert('La contraseña debe tener al menos 6 caracteres');
+    if (password.length < 6) {
+      Alert.alert('Error', 'La contraseña debe tener al menos 6 caracteres.');
       return;
     }
 
+    setLoading(true);
     try {
-      const newUser = { nombre, email, password, rol, direccion: '' };
-      await AsyncStorage.setItem('user', JSON.stringify(newUser));
-      alert('Usuario registrado con éxito');
-      navigation.replace('Login');
-    } catch (error) {
-      console.error('Error durante el registro:', error);
-      alert('Ocurrió un error al registrarse');
-    }
+      // 🔹 Petición al backend para registrar
+      const response = await API.post('register/', {
+        nombre,
+        email,
+        password,
+        tipo_usuario: rol, // 👈 coincide con el backend
+        direccion,
+        horarios,
+      });
 
+      console.log('✅ Usuario registrado:', response.data);
+
+      // 🔹 Luego de registrarse, login automático (opcional)
+      const loginResponse = await API.post('login/', { email, password });
+      const { access, refresh } = loginResponse.data;
+
+      await AsyncStorage.setItem('accessToken', access);
+      await AsyncStorage.setItem('refreshToken', refresh);
+
+      // 🔹 Obtener datos del usuario recién creado
+      const userResponse = await API.get('usuarios/me/', {
+        headers: { Authorization: `Bearer ${access}` },
+      });
+
+      const user = userResponse.data;
+      await AsyncStorage.setItem('user', JSON.stringify(user));
+
+      Alert.alert('✅ Registro exitoso', 'Sesión iniciada correctamente.');
+
+      // 🔹 Redirigir según tipo de usuario
+      if (user.tipo_usuario === 'farmacia') {
+        navigation.replace('HomeFarmacia');
+      } else if (user.tipo_usuario === 'repartidor') {
+        navigation.replace('HomeRepartidor');
+      } else {
+        navigation.replace('Home');
+      }
+    } catch (error) {
+      console.error('❌ Error al registrar usuario:', error.response?.data || error);
+      Alert.alert(
+        'Error',
+        error.response?.data?.detail ||
+          'No se pudo completar el registro. Intenta nuevamente.'
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Registro</Text>
+      <Text style={styles.title}>Crear cuenta</Text>
 
       <TextInput
         style={styles.input}
-        placeholder="Nombre"
+        placeholder="Nombre completo"
         value={nombre}
         onChangeText={setNombre}
       />
@@ -62,6 +104,8 @@ export default function RegisterScreen({ navigation }) {
       <TextInput
         style={styles.input}
         placeholder="Email"
+        keyboardType="email-address"
+        autoCapitalize="none"
         value={email}
         onChangeText={setEmail}
       />
@@ -74,31 +118,88 @@ export default function RegisterScreen({ navigation }) {
         onChangeText={setPassword}
       />
 
-      <View style={styles.pickerContainer}>
-        <Picker
-          selectedValue={rol}
-          onValueChange={(itemValue) => setRol(itemValue)}
-       >
-          <Picker.Item label="Usuario" value="usuario" />
-          <Picker.Item label="Farmacia" value="farmacia" />
-          <Picker.Item label="Repartidor" value="repartidor" />
-        </Picker>
-      </View>
+      <Text style={styles.label}>Selecciona tu rol</Text>
+      <Picker
+        selectedValue={rol}
+        onValueChange={(itemValue) => setRol(itemValue)}
+        style={styles.picker}
+      >
+        <Picker.Item label="Cliente" value="cliente" />
+        <Picker.Item label="Farmacia" value="farmacia" />
+        <Picker.Item label="Repartidor" value="repartidor" />
+      </Picker>
 
+      {rol === 'farmacia' && (
+        <>
+          <TextInput
+            style={styles.input}
+            placeholder="Dirección de la farmacia"
+            value={direccion}
+            onChangeText={setDireccion}
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Horarios de atención"
+            value={horarios}
+            onChangeText={setHorarios}
+          />
+        </>
+      )}
 
-      <Button title="Registrarse" onPress={handleRegister} />
+      {loading ? (
+        <ActivityIndicator size="large" color="#1E88E5" style={{ marginVertical: 10 }} />
+      ) : (
+        <Button
+          title="Registrarme"
+          onPress={handleRegister}
+          color="#1E88E5"
+          disabled={loading}
+        />
+      )}
+
+      <Text style={styles.link} onPress={() => navigation.replace('Login')}>
+        ¿Ya tenés cuenta? Iniciá sesión
+      </Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', padding: 20 },
-  title: { fontSize: 28, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' },
-  input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 10, marginBottom: 15 },
-  pickerContainer: {
-  borderWidth: 1,
-  borderColor: '#ccc',
-  borderRadius: 8,
-  marginBottom: 15,
-},
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+    padding: 20,
+  },
+  title: {
+    fontSize: 26,
+    fontWeight: 'bold',
+    color: '#1E88E5',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  label: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 5,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 15,
+  },
+  picker: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    marginBottom: 15,
+  },
+  link: {
+    color: '#1E88E5',
+    textAlign: 'center',
+    marginTop: 15,
+    fontSize: 14,
+  },
 });
