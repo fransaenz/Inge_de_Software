@@ -1,42 +1,35 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, FlatList } from "react-native";
+import API from "../api";
 
 export default function PedidoActivoScreen({ route, navigation }) {
   const { pedido } = route.params;
-  const [retirado, setRetirado] = useState(pedido.estado === "en camino");
+  const [estado, setEstado] = useState(pedido.estado);
+  const [loading, setLoading] = useState(false);
 
-  const marcarRetirado = async () => {
-  const stored = await AsyncStorage.getItem("pedidosRepartidor");
-  const updated = JSON.parse(stored).map(p =>
-    p.id === pedido.id ? { ...p, estado: "retirado" } : p
-  );
+  const actualizarEstado = async (nuevoEstado, mensaje) => {
+    try {
+      setLoading(true);
+      const response = await API.patch(`pedidos/${pedido.id}/`, { estado: nuevoEstado });
+      setEstado(response.data.estado);
+      Alert.alert(mensaje.titulo, mensaje.texto);
+      if (nuevoEstado === "entregado") navigation.replace("HomeRepartidor");
+    } catch (error) {
+      console.error("Error al actualizar pedido:", error);
+      Alert.alert("Error", "No se pudo actualizar el estado del pedido.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  setRetirado(true);
-  await AsyncStorage.setItem("pedidosRepartidor", JSON.stringify(updated));
-
-  // ✅ actualizar también farmacia
-  const storedFarmacia = await AsyncStorage.getItem("farmaciaOrders");
-  if (storedFarmacia) {
-    const orders = JSON.parse(storedFarmacia)
-      .filter(o => o.id !== pedido.id); // 🔥 eliminar de vista farmacia
-
-    await AsyncStorage.setItem("farmaciaOrders", JSON.stringify(orders));
+  if (loading) {
+    return (
+      <View style={[styles.container, { justifyContent: "center", alignItems: "center" }]}>
+        <ActivityIndicator size="large" color="#1565C0" />
+        <Text>Actualizando pedido...</Text>
+      </View>
+    );
   }
-
-  Alert.alert("📦 Pedido retirado de farmacia", "Procede a entregar.");
-};
-
-
-  const marcarEntregado = async () => {
-  const stored = await AsyncStorage.getItem("pedidosRepartidor");
-  const updated = JSON.parse(stored).map(p =>
-    p.id === pedido.id ? { ...p, estado: "entregado" } : p
-  );
-
-  await AsyncStorage.setItem("pedidosRepartidor", JSON.stringify(updated));
-  navigation.replace("HomeRepartidor");
-};
 
   return (
     <View style={styles.container}>
@@ -44,24 +37,48 @@ export default function PedidoActivoScreen({ route, navigation }) {
 
       <View style={styles.card}>
         <Text style={styles.label}>Farmacia:</Text>
-        <Text style={styles.text}>{pedido.farmacia}</Text>
+        <Text style={styles.text}>{pedido.farmacia_nombre}</Text>
 
-        <Text style={styles.label}>Dirección farmacia:</Text>
-        <Text style={styles.text}>{pedido.direccionFarmacia}</Text>
+        <Text style={styles.label}>Dirección de la farmacia:</Text>
+        <Text style={styles.text}>{pedido.direccion_farmacia}</Text>
 
         <Text style={styles.label}>Dirección de entrega:</Text>
-        <Text style={styles.text}>{pedido.direccionCliente || "Dirección del cliente"}</Text>
+        <Text style={styles.text}>{pedido.direccion_entrega}</Text>
 
         <Text style={styles.label}>Productos:</Text>
-        <Text style={styles.text}>{pedido.productos}</Text>
+        <FlatList
+          data={pedido.detalles}
+          keyExtractor={(item, index) => index.toString()}
+          renderItem={({ item }) => (
+            <Text style={styles.text}>
+              • {item.producto.nombre} x{item.cantidad} (${item.precio_unitario})
+            </Text>
+          )}
+        />
       </View>
 
-      {!retirado ? (
-        <TouchableOpacity style={styles.button} onPress={marcarRetirado}>
+      {estado !== "retirado" ? (
+        <TouchableOpacity
+          style={styles.button}
+          onPress={() =>
+            actualizarEstado("retirado", {
+              titulo: "📦 Pedido retirado",
+              texto: "Procede a entregar al cliente.",
+            })
+          }
+        >
           <Text style={styles.buttonText}>📦 Marcar como retirado</Text>
         </TouchableOpacity>
       ) : (
-        <TouchableOpacity style={[styles.button, { backgroundColor: "#2E7D32" }]} onPress={marcarEntregado}>
+        <TouchableOpacity
+          style={[styles.button, { backgroundColor: "#2E7D32" }]}
+          onPress={() =>
+            actualizarEstado("entregado", {
+              titulo: "✅ Pedido entregado",
+              texto: "Entrega registrada correctamente.",
+            })
+          }
+        >
           <Text style={styles.buttonText}>✅ Marcar como entregado</Text>
         </TouchableOpacity>
       )}
@@ -81,5 +98,5 @@ const styles = StyleSheet.create({
   label: { fontWeight: "600", marginTop: 8 },
   text: { fontSize: 16, marginBottom: 6 },
   button: { backgroundColor: "#1565C0", padding: 14, borderRadius: 8, marginBottom: 10 },
-  buttonText: { textAlign: "center", color: "#fff", fontWeight: "600" }
+  buttonText: { textAlign: "center", color: "#fff", fontWeight: "600" },
 });

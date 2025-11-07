@@ -5,7 +5,7 @@ import { Alert } from "react-native";
 // 🌐 Dirección base del backend Django
 // ⚠️ Usá tu IP local (la de tu PC con el backend encendido)
 const API = axios.create({
-  baseURL: "http://192.168.0.47:8000/api/", // ✅ agregado el puerto 8000
+  baseURL: "http://192.168.56.1:8000/api/", // ✅ agregado el puerto 8000
   timeout: 10000,
 });
 

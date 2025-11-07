@@ -10,4 +10,13 @@ urlpatterns = [
 
     # 🔹 Crear pedido (cliente → farmacia)
     path('crear/<int:farmacia_id>/', views.CrearPedidoView.as_view(), name='crear-pedido'),
+    
+    # 🔹 ver pedidos disponibles (repartidor)
+    path('repartidor/', views.PedidosDisponiblesView.as_view(), name='pedidos-repartidor'),
+    
+    # 🔹 aceptar pedido (repartidor)
+    path('<int:pk>/asignar/', views.AceptarPedidoView.as_view(), name='asignar-pedido'),
+
+    # 🔹 rechazar pedido (repartidor)
+    path('<int:pk>/rechazar/', views.RechazarPedidoView.as_view(), name='rechazar-pedido'),
 ]
