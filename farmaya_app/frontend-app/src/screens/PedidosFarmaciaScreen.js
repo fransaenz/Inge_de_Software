@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, Alert, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+import { useEffect, useState } from 'react';
+import { Alert, FlatList, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function PedidosFarmacia() {
   const [orders, setOrders] = useState([]);
@@ -53,7 +53,7 @@ export default function PedidosFarmacia() {
       const downloaded = await FileSystem.downloadAsync(url, fileUri);
       await Sharing.shareAsync(downloaded.uri);
     } catch (error) {
-      Alert.alert('Error', 'No se pudo abrir el archivo');
+      Alert.alert(error, 'No se pudo abrir el archivo');
     }
   };
 

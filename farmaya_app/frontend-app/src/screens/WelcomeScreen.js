@@ -6,6 +6,13 @@ export default function WelcomeScreen({ navigation }) {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <TouchableOpacity 
+        style={styles.themeToggle}
+        onPress={toggleTheme}
+      >
+        <Text style={styles.themeIcon}>{isDarkMode ? '🌞' : '🌙'}</Text>
+      </TouchableOpacity>
+      
       <View style={styles.logoContainer}>
         <Image
           source={require('../assets/logo.png')} // Asegúrate de tener el logo en esta ruta
@@ -21,22 +28,16 @@ export default function WelcomeScreen({ navigation }) {
         Tu farmacia de confianza, a domicilio
       </Text>
 
-      <TouchableOpacity onPress={toggleTheme}>
-        <Text style={{ color: theme.colors.primary }}>
-          Cambiar a modo {isDarkMode ? 'claro' : 'oscuro'}
-        </Text>
-      </TouchableOpacity>
-
       <View style={styles.buttonContainer}>
         <TouchableOpacity
-          style={styles.button}
+          style={[styles.button, { backgroundColor: theme.colors.primary }]}
           onPress={() => navigation.navigate('Login')}
         >
           <Text style={styles.buttonText}>Iniciar Sesión</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.button, styles.registerButton]}
+          style={[styles.button, styles.registerButton, { backgroundColor: theme.colors.secondary }]}
           onPress={() => navigation.navigate('Register')}
         >
           <Text style={styles.buttonText}>Registrarse</Text>
@@ -77,18 +78,27 @@ const styles = StyleSheet.create({
     gap: 15,
   },
   button: {
-    backgroundColor: '#007AFF',
     padding: 15,
     borderRadius: 10,
     width: '100%',
   },
   registerButton: {
-    backgroundColor: '#34C759',
+    marginTop: 10,
   },
   buttonText: {
     color: '#fff',
     textAlign: 'center',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  themeToggle: {
+    position: 'absolute',
+    top: 40,
+    right: 20,
+    padding: 8,
+    zIndex: 1,
+  },
+  themeIcon: {
+    fontSize: 24,
   },
 });
