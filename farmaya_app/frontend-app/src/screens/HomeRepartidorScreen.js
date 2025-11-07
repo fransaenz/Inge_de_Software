@@ -1,112 +1,129 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import API from '../api/api';
+import React, { useEffect, useState } from "react";
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, Alert } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
-export default function HomeRepartidorScreen() {
+export default function HomeRepartidorScreen({ navigation }) {
   const [pedidos, setPedidos] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  // 🔹 Obtener pedidos asignados al repartidor
-  const fetchPedidos = async () => {
-    try {
-      const token = await AsyncStorage.getItem('accessToken');
-      if (!token) {
-        Alert.alert('Sesión expirada', 'Por favor, inicia sesión nuevamente.');
-        return;
-      }
-
-      // ✅ Nueva ruta correcta
-      const response = await API.get('accounts/pedidos/repartidor/', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      setPedidos(response.data);
-    } catch (error) {
-      console.error('Error al obtener pedidos:', error.response?.data || error);
-      Alert.alert('Error', 'No se pudieron cargar los pedidos.');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   useEffect(() => {
-    fetchPedidos();
+    const loadPedidos = async () => {
+      const stored = await AsyncStorage.getItem("pedidosRepartidor");
+
+      if (stored) {
+        setPedidos(JSON.parse(stored));
+      } else {
+        // ✅ Pedidos simulados LISTOS para repartidor
+        const mockPedidos = [
+          {
+            id: "1",
+            farmacia: "Farmacia Central",
+            direccionFarmacia: "Av. Siempre Viva 742",
+            direccionCliente: "Calle 50 #800",
+            distancia: 2.4,
+            productos: "Ibuprofeno + Amoxicilina",
+            estado: "confirmado", // 👈 IMPORTANTE
+          },
+          {
+            id: "2",
+            farmacia: "Farmacity",
+            direccionFarmacia: "Calle 12 #1200",
+            direccionCliente: "Av. 7 #1420",
+            distancia: 4.7,
+            productos: "Paracetamol 500mg",
+            estado: "confirmado", // 👈 IMPORTANTE
+          }
+        ];
+
+        setPedidos(mockPedidos);
+        await AsyncStorage.setItem("pedidosRepartidor", JSON.stringify(mockPedidos));
+      }
+    };
+
+    loadPedidos();
   }, []);
 
-  // 🔹 Marcar pedido como entregado
-  const marcarEntregado = async (id) => {
-    try {
-      const token = await AsyncStorage.getItem('accessToken');
-      await API.put(
-        `accounts/pedidos/${id}/`,
-        { estado: 'entregado' },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+  // ✅ Solo mostrar pedidos confirmados
+  const pedidosDisponibles = pedidos.filter(p => p.estado === "confirmado");
 
-      Alert.alert('✅ Entregado', 'Pedido marcado como entregado.');
-      setPedidos((prev) =>
-        prev.map((p) => (p.id === id ? { ...p, estado: 'entregado' } : p))
-      );
-    } catch (error) {
-      console.error('Error al marcar como entregado:', error.response?.data || error);
-      Alert.alert('Error', 'No se pudo actualizar el pedido.');
-    }
+  // ✅ Si tiene un pedido tomado, ir a pantalla activa
+  const pedidoActivo = pedidos.find(p => p.estado === "asignado" || p.estado === "retirado");
+  if (pedidoActivo) {
+    navigation.replace("PedidoActivo", { pedido: pedidoActivo });
+    return null;
+  }
+
+  const aceptarPedido = async (id) => {
+  const repartidor = { nombre: "Repartidor Test" }; // luego vendrá del login
+  
+  const updated = pedidos.map(p =>
+    p.id === id 
+      ? { ...p, estado: "asignado", repartidor } // ✅ agregar repartidor
+      : p
+  );
+
+  setPedidos(updated);
+  await AsyncStorage.setItem("pedidosRepartidor", JSON.stringify(updated));
+
+  // ✅ también actualizar almacenamiento de farmacia
+  const storedFarmacia = await AsyncStorage.getItem("farmaciaOrders");
+  if (storedFarmacia) {
+    const orders = JSON.parse(storedFarmacia).map(o =>
+      o.id === id ? { ...o, estado: "asignado", repartidor } : o
+    );
+    await AsyncStorage.setItem("farmaciaOrders", JSON.stringify(orders));
+  }
+
+  const pedido = updated.find(p => p.id === id);
+  navigation.replace("PedidoActivo", { pedido });
+};
+
+  const rechazarPedido = async (id) => {
+    const updated = pedidos.filter(p => p.id !== id);
+    setPedidos(updated);
+    await AsyncStorage.setItem("pedidosRepartidor", JSON.stringify(updated));
+
+    Alert.alert("❌ Pedido rechazado", "Se asignará a otro repartidor");
   };
 
-  const renderPedido = ({ item }) => (
+  const renderItem = ({ item }) => (
     <View style={styles.card}>
-      <Text style={styles.text}>📦 Pedido #{item.id}</Text>
-      <Text style={styles.text}>👤 Cliente: {item.usuario}</Text>
-      <Text style={styles.text}>📍 Dirección: {item.direccion_entrega}</Text>
-      <Text style={styles.text}>💊 Producto: {item.producto_nombre}</Text>
-      <Text style={styles.text}>Estado: {item.estado}</Text>
+      <Text style={styles.title}>{item.farmacia}</Text>
+      <Text>📍 {item.direccionFarmacia}</Text>
+      <Text>🏠 {item.direccionCliente}</Text>
+      <Text>🛵 Distancia: {item.distancia} km</Text>
+      <Text>💊 Pedido: {item.productos}</Text>
 
-      {item.estado !== 'entregado' && (
-        <TouchableOpacity
-          style={styles.button}
-          onPress={() => marcarEntregado(item.id)}
-        >
-          <Text style={styles.buttonText}>Marcar como entregado</Text>
+      <View style={styles.buttons}>
+        <TouchableOpacity style={styles.accept} onPress={() => aceptarPedido(item.id)}>
+          <Text style={styles.btnText}>Aceptar ✅</Text>
         </TouchableOpacity>
-      )}
+        <TouchableOpacity style={styles.reject} onPress={() => rechazarPedido(item.id)}>
+          <Text style={styles.btnText}>Rechazar ❌</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 
-  if (loading) {
-    return <ActivityIndicator size="large" color="#1E88E5" style={{ flex: 1 }} />;
-  }
-
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>🛵 Pedidos Asignados</Text>
+      <Text style={styles.header}>🚚 Pedidos Disponibles</Text>
+
       <FlatList
-        data={pedidos}
-        keyExtractor={(item) => item.id.toString()}
-        renderItem={renderPedido}
-        ListEmptyComponent={<Text>No hay pedidos pendientes.</Text>}
+        data={pedidosDisponibles.sort((a, b) => a.distancia - b.distancia)}
+        keyExtractor={item => item.id}
+        renderItem={renderItem}
       />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff', padding: 16 },
-  title: { fontSize: 22, fontWeight: 'bold', marginBottom: 16, textAlign: 'center' },
-  card: {
-    backgroundColor: '#f9f9f9',
-    padding: 16,
-    borderRadius: 10,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#ddd',
-  },
-  text: { fontSize: 15, marginBottom: 4 },
-  button: {
-    backgroundColor: '#1E88E5',
-    padding: 10,
-    borderRadius: 8,
-    marginTop: 8,
-  },
-  buttonText: { color: '#fff', textAlign: 'center', fontWeight: 'bold' },
+  container: { flex: 1, padding: 20, backgroundColor: "#fff" },
+  header: { fontSize: 22, fontWeight: "700", marginBottom: 12 },
+  card: { padding: 14, backgroundColor: "#f9f9f9", borderRadius: 10, marginBottom: 12, borderWidth: 1, borderColor: "#ddd" },
+  title: { fontSize: 18, fontWeight: "600" },
+  buttons: { flexDirection: "row", marginTop: 10, gap: 10 },
+  accept: { flex: 1, backgroundColor: "#2E7D32", padding: 10, borderRadius: 6 },
+  reject: { flex: 1, backgroundColor: "#C62828", padding: 10, borderRadius: 6 },
+  btnText: { color: "#fff", textAlign: "center", fontWeight: "600" }
 });

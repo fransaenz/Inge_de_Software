@@ -72,6 +72,9 @@ export default function PedidosFarmaciaScreen() {
     }
   };
 
+  // Filtrar para NO mostrar pedidos retirados
+  const visibleOrders = orders.filter(o => o.estado !== 'retirado');
+
   const renderItem = ({ item }) => (
     <View style={styles.card}>
       <Text style={styles.text}>👤 Cliente: {item.usuario_email}</Text>
