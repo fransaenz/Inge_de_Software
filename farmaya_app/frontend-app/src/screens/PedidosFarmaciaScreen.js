@@ -1,70 +1,75 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, Alert, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, Alert, ActivityIndicator, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+import API from '../api/api';
 
-export default function PedidosFarmacia() {
+export default function PedidosFarmaciaScreen() {
   const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // 🔹 Obtener pedidos desde el backend
+  const loadOrders = async () => {
+    try {
+      const token = await AsyncStorage.getItem('accessToken');
+      if (!token) {
+        Alert.alert('Sesión expirada', 'Por favor, inicie sesión nuevamente.');
+        return;
+      }
+
+      // ✅ Ruta correcta del backend
+      const response = await API.get('accounts/pedidos/farmacia/', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setOrders(response.data);
+    } catch (error) {
+      console.error('Error al cargar pedidos:', error.response?.data || error);
+      Alert.alert('Error', 'No se pudieron cargar los pedidos.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const loadOrders = async () => {
-      const stored = await AsyncStorage.getItem('farmaciaOrders');
-
-      if (stored) {
-        setOrders(JSON.parse(stored));
-      } else {
-        // ✅ Estados simulados correctos
-        const initialOrders = [
-          {
-            id: '1',
-            cliente: 'Juan Pérez',
-            obraSocial: 'OSDE',
-            receta: true,
-            estado: 'pendiente_validacion',
-            archivoURL: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf'
-          },
-          {
-            id: '2',
-            cliente: 'Maria Lopez',
-            obraSocial: 'IOMA',
-            receta: false,
-            estado: 'confirmado', // no necesita validación
-            producto: 'Ibuprofeno 600mg'
-          }
-        ];
-
-        setOrders(initialOrders);
-        await AsyncStorage.setItem('farmaciaOrders', JSON.stringify(initialOrders));
-      }
-    };
-
     loadOrders();
   }, []);
 
-  const openPDF = async (url) => {
+  // 🔹 Descargar y abrir receta
+  const openFile = async (url) => {
     try {
       if (Platform.OS === 'web') {
         window.open(url, '_blank');
         return;
       }
 
-      const fileUri = FileSystem.documentDirectory + 'temp.pdf';
-      const downloaded = await FileSystem.downloadAsync(url, fileUri);
-      await Sharing.shareAsync(downloaded.uri);
+      const fileUri = FileSystem.documentDirectory + 'receta_temp.pdf';
+      const { uri } = await FileSystem.downloadAsync(url, fileUri);
+      await Sharing.shareAsync(uri);
     } catch (error) {
-      Alert.alert('Error', 'No se pudo abrir el archivo');
+      console.error('Error al abrir archivo:', error);
+      Alert.alert('Error', 'No se pudo abrir la receta.');
     }
   };
 
-  const validarReceta = async (id) => {
-    const updated = orders.map(order =>
-      order.id === id ? { ...order, estado: 'confirmado' } : order
-    );
+  // 🔹 Validar receta → cambiar estado del pedido
+  const validarReceta = async (pedidoId) => {
+    try {
+      const token = await AsyncStorage.getItem('accessToken');
+      await API.put(
+        `accounts/pedidos/${pedidoId}/`,
+        { estado: 'aprobado' },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
 
-    setOrders(updated);
-    await AsyncStorage.setItem('farmaciaOrders', JSON.stringify(updated));
-    Alert.alert('✅ Receta validada', 'El pedido está listo para repartidor.');
+      Alert.alert('✅ Receta validada', 'El pedido fue aprobado.');
+      setOrders((prev) =>
+        prev.map((o) => (o.id === pedidoId ? { ...o, estado: 'aprobado' } : o))
+      );
+    } catch (error) {
+      console.error('Error al validar receta:', error.response?.data || error);
+      Alert.alert('Error', 'No se pudo validar la receta.');
+    }
   };
 
   // Filtrar para NO mostrar pedidos retirados
@@ -72,55 +77,51 @@ export default function PedidosFarmacia() {
 
   const renderItem = ({ item }) => (
     <View style={styles.card}>
-      <Text style={styles.text}>👤 Cliente: {item.cliente}</Text>
+      <Text style={styles.text}>👤 Cliente: {item.usuario_email}</Text>
+      <Text style={styles.text}>💊 Producto: {item.producto_nombre}</Text>
+      <Text style={styles.text}>📦 Cantidad: {item.cantidad}</Text>
+      <Text style={styles.text}>🏠 Dirección: {item.direccion_entrega}</Text>
 
-{item.repartidor && (
-  <Text style={styles.text}>🛵 Repartidor: {item.repartidor.nombre}</Text>
-)}
-
-<Text style={styles.text}>🏥 Obra social: {item.obraSocial}</Text>
-
-      
-
-      {item.receta ? (
+      {item.receta_url ? (
         <>
           <Text style={styles.text}>🧾 Receta adjunta</Text>
-          <TouchableOpacity style={styles.smallButton} onPress={() => openPDF(item.archivoURL)}>
+          <TouchableOpacity
+            style={styles.smallButton}
+            onPress={() => openFile(item.receta_url)}
+          >
             <Text style={styles.smallButtonText}>📄 Ver receta</Text>
           </TouchableOpacity>
         </>
       ) : (
-        <>
-          <Text style={styles.text}>🛒 Producto: {item.producto}</Text>
-        </>
+        <Text style={styles.text}>🚫 No requiere receta</Text>
       )}
 
       <Text style={styles.text}>
-        📌 Estado: {
-          item.estado === 'pendiente_validacion' ? '⏳ Pendiente validación' :
-          item.estado === 'confirmado' ? '✅ Confirmado' :
-          item.estado === 'asignado' ? '📦 Asignado a repartidor' :
-          item.estado === 'retirado' ? '🚚 Retirado' :
-          item.estado === 'entregado' ? '🎉 Entregado' : item.estado
-        }
+        📌 Estado: {item.estado === 'pendiente' ? '⏳ Pendiente' : '✅ Aprobado'}
       </Text>
 
-      {/*Solo mostrar botón si tiene receta y está pendiente */}
-      {item.receta && item.estado === 'pendiente_validacion' && (
-        <TouchableOpacity style={styles.button} onPress={() => validarReceta(item.id)}>
+      {item.estado === 'pendiente' && item.receta_url && (
+        <TouchableOpacity
+          style={styles.button}
+          onPress={() => validarReceta(item.id)}
+        >
           <Text style={styles.buttonText}>Validar Receta</Text>
         </TouchableOpacity>
       )}
     </View>
   );
 
+  if (loading)
+    return <ActivityIndicator size="large" color="#1E88E5" style={{ flex: 1 }} />;
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>📦 Pedidos Recibidos</Text>
       <FlatList
-        data={visibleOrders}
-        keyExtractor={item => item.id}
+        data={orders}
+        keyExtractor={(item) => item.id.toString()}
         renderItem={renderItem}
+        ListEmptyComponent={<Text>No hay pedidos nuevos</Text>}
       />
     </View>
   );
@@ -143,7 +144,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 6,
     marginBottom: 6,
-    width: 120
+    width: 120,
   },
   smallButtonText: { color: '#fff', textAlign: 'center', fontWeight: '600' },
   button: {
